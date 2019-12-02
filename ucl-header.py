@@ -14,6 +14,21 @@ XML_FILE = sys.argv[1]
 BIN_FILE = XML_FILE.replace(".xml.", ".bin.")
 
 
+with open(XML_FILE) as input_file:
+    DOC = xmltodict.parse(input_file.read())
+
+flash_segment = DOC['BINARY-HEADER']['BINARY-FLASHBLOCK']['FLASH-SEGMENTS']['FLASH-SEGMENT']
+
+source_start = flash_segment['SOURCE-START-ADDRESS']
+source_end = flash_segment['SOURCE-END-ADDRESS']
+source_size = int(source_end, 16) - int(source_start, 16) + 1
+
+target_start = flash_segment['TARGET-START-ADDRESS']
+target_end = flash_segment['TARGET-END-ADDRESS']
+target_size = int(target_end, 16) - int(target_start, 16) + 1
+
+
+
 def build_header(decompression_method=b"\x2b", level=b"\x01"):
     """
     Flags: Mostly unclear, LSByte controls the generation of a CRC-32 (different from the one in your xml file
@@ -45,12 +60,11 @@ def build_header(decompression_method=b"\x2b", level=b"\x01"):
 
     header += level
 
-    source_size_string, target_size_string = parse_xml()
-    print("compressed size:", source_size_string)
-    print("decompressed size:", target_size_string)
+    print("compressed size:", source_size)
+    print("decompressed size:", target_size)
 
-    compressed_size = source_size_string.to_bytes(4, byteorder='big')
-    decompressed_size = target_size_string.to_bytes(4, byteorder='big')
+    compressed_size = source_size.to_bytes(4, byteorder='big')
+    decompressed_size = target_size.to_bytes(4, byteorder='big')
 
     # block size - need to know unpacked size first, or default to something giant
     # example was 0002 0000 which is 128KB
@@ -66,23 +80,6 @@ def build_header(decompression_method=b"\x2b", level=b"\x01"):
     return header
 
 
-def parse_xml():
-    with open(XML_FILE) as input_file:
-        doc = xmltodict.parse(input_file.read())
-
-    flash_segment = doc['BINARY-HEADER']['BINARY-FLASHBLOCK']['FLASH-SEGMENTS']['FLASH-SEGMENT']
-
-    source_start = flash_segment['SOURCE-START-ADDRESS']
-    source_end = flash_segment['SOURCE-END-ADDRESS']
-    source_size = int(source_end, 16) - int(source_start, 16) + 1
-
-    target_start = flash_segment['TARGET-START-ADDRESS']
-    target_end = flash_segment['TARGET-END-ADDRESS']
-    target_size = int(target_end, 16) - int(target_start, 16) + 1
-
-    return source_size, target_size
-
-
 header = build_header()
 
 UCL_BIN_FILE = BIN_FILE+'.ucl'
@@ -95,7 +92,8 @@ print("Created new file with UCL header attached - "+UCL_BIN_FILE)
 print("Trying to unpack it for you...")
 
 # todo: run docker as current UID
-command = "docker-compose run ucl -d "+UCL_BIN_FILE+" "+BIN_FILE+".unpacked"
+UNPACKED_BIN_FILE = BIN_FILE+".unpacked"
+command = "docker-compose run ucl -d "+UCL_BIN_FILE+" "+UNPACKED_BIN_FILE
 print(command)
 split_command = command.split(" ")
 
@@ -105,3 +103,10 @@ print(completedProc.returncode)
 
 # check file size vs xml expected
 # write file to virtual DME file also?
+
+
+with open('dme', 'r+b') as dme_file:
+    dme_file.seek(int(target_start, 16) - 0x80000000)
+
+    with open(UNPACKED_BIN_FILE, 'rb') as unpacked_bin:
+        dme_file.write(unpacked_bin.read())
