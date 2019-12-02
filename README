@@ -1,0 +1,12 @@
+Add the UCL header:
+python ucl-header.py [xml file]
+then it tells you what to run in docker to unpack
+
+TODO:
+
+unpack in python?
+or shell out for it at least?
+
+use the xml files to actually unpack these files into one big file (emulated DME storage)
+then would be able to dump from it
+- remove 80000000 from the target addresses
