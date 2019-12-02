@@ -1,5 +1,7 @@
 import sys
 import xmltodict
+import subprocess
+
 
 MAGIC = b"\x00\xe9\x55\x43\x4c\xff\x01\x1a"
 
@@ -90,6 +92,16 @@ with open(UCL_BIN_FILE, 'wb') as output_file:
         output_file.write(packed_bin.read())
 
 print("Created new file with UCL header attached - "+UCL_BIN_FILE)
-print("Try to unpack it now")
-print("Even if it errors it might have unpacked most/all of it")
-print("  docker-compose run ucl -d "+UCL_BIN_FILE+" "+BIN_FILE+".unpacked")
+print("Trying to unpack it for you...")
+
+# todo: run docker as current UID
+command = "docker-compose run ucl -d "+UCL_BIN_FILE+" "+BIN_FILE+".unpacked"
+print(command)
+split_command = command.split(" ")
+
+completedProc = subprocess.run(split_command)
+
+print(completedProc.returncode)
+
+# check file size vs xml expected
+# write file to virtual DME file also?
